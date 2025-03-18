@@ -89,7 +89,7 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
    * @param embeddings Embeddings to be searched.
    * @param options Additional options for search process.
    */
-  abstract search(
+  abstract searchInCollection(
     agreement: Agreement,
     resource: Resource,
     collection: string,
@@ -107,6 +107,32 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
       metricType?: MetricType;
     }
   ): Promise<any[]>;
+
+  /**
+   * Searches for nearest neighbors across all available collections.
+   * @param agreement On-chain agreement data.
+   * @param resource Resource record of the agreement.
+   * @param vectorField Vector field/column name.
+   * @param embeddings Embeddings to be searched.
+   * @param options Additional options for search process.
+   */
+  abstract search(
+    agreement: Agreement,
+    resource: Resource,
+    vectorField: string,
+    embeddings: any[],
+    options?: {
+      /**
+       * Total result count per collection.
+       */
+      limit?: number;
+
+      /**
+       * Distance metric type.
+       */
+      metricType?: MetricType;
+    }
+  ): Promise<{ [collection: string]: any[] }>;
 
   /**
    * Insert data into a collection
@@ -233,7 +259,7 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
     /**
      * Gets the nearest neighbors for the given embeddings.
      */
-    this.route(PipeMethod.POST, "/search", async (req) => {
+    this.route(PipeMethod.POST, "/searchInCollection", async (req) => {
       const body = validateBodyOrParams(
         req.body,
         z.object({
@@ -270,10 +296,61 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
         req.requester
       );
 
-      const result = await this.search(
+      const result = await this.searchInCollection(
         agreement,
         resource,
         body.collection,
+        body.vectorField,
+        body.embeddings,
+        body.options
+      );
+
+      return {
+        code: PipeResponseCode.OK,
+        body: result,
+      };
+    });
+
+    /**
+     * Searches for nearest neighbors across all available collections.
+     */
+    this.route(PipeMethod.POST, "/search", async (req) => {
+      const body = validateBodyOrParams(
+        req.body,
+        z.object({
+          /** ID of the resource. */
+          id: z.number(),
+
+          /** Product category address. */
+          pc: addressSchema,
+
+          /** Name of the vector column. */
+          vectorField: z.string(),
+
+          /** Embeddings to be searched. */
+          embeddings: z.array(z.any()).min(1),
+
+          /** Additional options. */
+          options: z
+            .object({
+              /** Total result count per collection. */
+              limit: z.number().optional(),
+
+              /** Metric type of the distance calculation. */
+              metricType: metricTypeSchema.optional(),
+            })
+            .optional(),
+        })
+      );
+      const { resource, agreement } = await this.getResource(
+        body.id,
+        body.pc as Address,
+        req.requester
+      );
+
+      const result = await this.search(
+        agreement,
+        resource,
         body.vectorField,
         body.embeddings,
         body.options
