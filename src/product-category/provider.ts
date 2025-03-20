@@ -18,15 +18,23 @@ export class VectorDBProvider extends BaseVectorDBProvider {
     resource: Resource,
     collection: string,
     vectorField: string,
-    embeddings: any[],
+    query: any[] | string,
     options?: {
       limit?: number;
       metricType?: MetricType;
+      searchFields?: string[];
     }
   ): Promise<any[]> {
-    /**
-     * TODO: Implement how to retrieve closest embeddings.
-     */
+    if (typeof query === 'string') {
+      // Implement content search logic using the description
+      // Include logic to find and return similar images
+      // Example: return searchResultsIncludingImages;
+    } else if (Array.isArray(query)) {
+      // Implement embeddings search logic
+      // Example: return searchResultsIncludingImages;
+    } else {
+      throw new Error("Invalid query type.");
+    }
     throw new Error("Method not implemented.");
   }
 
@@ -34,10 +42,11 @@ export class VectorDBProvider extends BaseVectorDBProvider {
     agreement: Agreement,
     resource: Resource,
     vectorField: string,
-    embeddings: any[],
+    query: any[] | string,
     options?: {
       limit?: number;
       metricType?: MetricType;
+      searchFields?: string[];
     }
   ): Promise<{ [collection: string]: any[] }> {
     // TODO: Implement getting all collections
@@ -47,7 +56,7 @@ export class VectorDBProvider extends BaseVectorDBProvider {
       resource,
       collections,
       vectorField,
-      embeddings,
+      query,
       options
     );
   }
@@ -57,10 +66,11 @@ export class VectorDBProvider extends BaseVectorDBProvider {
     resource: Resource,
     collections: string[],
     vectorField: string,
-    embeddings: any[],
+    query: any[] | string,
     options?: {
       limit?: number;
       metricType?: MetricType;
+      searchFields?: string[];
     }
   ): Promise<{ [collection: string]: any[] }> {
     const results: { [collection: string]: any[] } = {};
@@ -71,7 +81,7 @@ export class VectorDBProvider extends BaseVectorDBProvider {
           resource,
           collection,
           vectorField,
-          embeddings,
+          query,
           options
         );
       } catch (error) {
