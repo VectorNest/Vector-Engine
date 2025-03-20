@@ -13,7 +13,7 @@ import { DetailedOffer, Resource } from "@/types";
  * @responsible Provider
  */
 export class VectorDBProvider extends BaseVectorDBProvider {
-  async search(
+  async searchInCollection(
     agreement: Agreement,
     resource: Resource,
     collection: string,
@@ -28,6 +28,57 @@ export class VectorDBProvider extends BaseVectorDBProvider {
      * TODO: Implement how to retrieve closest embeddings.
      */
     throw new Error("Method not implemented.");
+  }
+
+  async search(
+    agreement: Agreement,
+    resource: Resource,
+    vectorField: string,
+    embeddings: any[],
+    options?: {
+      limit?: number;
+      metricType?: MetricType;
+    }
+  ): Promise<{ [collection: string]: any[] }> {
+    // TODO: Implement getting all collections
+    const collections: string[] = [];
+    return this.searchAcrossCollections(
+      agreement,
+      resource,
+      collections,
+      vectorField,
+      embeddings,
+      options
+    );
+  }
+
+  async searchAcrossCollections(
+    agreement: Agreement,
+    resource: Resource,
+    collections: string[],
+    vectorField: string,
+    embeddings: any[],
+    options?: {
+      limit?: number;
+      metricType?: MetricType;
+    }
+  ): Promise<{ [collection: string]: any[] }> {
+    const results: { [collection: string]: any[] } = {};
+    for (const collection of collections) {
+      try {
+        results[collection] = await this.searchInCollection(
+          agreement,
+          resource,
+          collection,
+          vectorField,
+          embeddings,
+          options
+        );
+      } catch (error) {
+        results[collection] = [];
+      }
+    }
+    return results;
   }
 
   async insertData(
