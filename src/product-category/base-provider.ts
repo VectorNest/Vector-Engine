@@ -52,6 +52,7 @@ const fieldSchema = z.object({
     "Float",
     "Vector",
     "Boolean",
+    "Image",
   ]),
   properties: z
     .object({
@@ -81,12 +82,12 @@ export type MetricType = z.infer<typeof metricTypeSchema>;
  */
 export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDetails> {
   /**
-   * Retrieves the nearest neighbors for the given embeddings.
+   * Retrieves the nearest neighbors for the given embeddings or content.
    * @param agreement On-chain agreement data.
    * @param resource Resource record of the agreement.
    * @param collection Collection name.
    * @param vectorField Vector field/column name.
-   * @param embeddings Embeddings to be searched.
+   * @param query Search query - can be either embeddings array or text content
    * @param options Additional options for search process.
    */
   abstract searchInCollection(
@@ -94,7 +95,7 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
     resource: Resource,
     collection: string,
     vectorField: string,
-    embeddings: any[],
+    query: any[] | string,
     options?: {
       /**
        * Total result count.
@@ -105,6 +106,11 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
        * Distance metric type.
        */
       metricType?: MetricType;
+
+      /**
+       * Fields to search in when using content search
+       */
+      searchFields?: string[];
     }
   ): Promise<any[]>;
 
@@ -113,14 +119,14 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
    * @param agreement On-chain agreement data.
    * @param resource Resource record of the agreement.
    * @param vectorField Vector field/column name.
-   * @param embeddings Embeddings to be searched.
+   * @param query Search query - can be either embeddings array or text content
    * @param options Additional options for search process.
    */
   abstract search(
     agreement: Agreement,
     resource: Resource,
     vectorField: string,
-    embeddings: any[],
+    query: any[] | string,
     options?: {
       /**
        * Total result count per collection.
@@ -131,6 +137,11 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
        * Distance metric type.
        */
       metricType?: MetricType;
+
+      /**
+       * Fields to search in when using content search
+       */
+      searchFields?: string[];
     }
   ): Promise<{ [collection: string]: any[] }>;
 
@@ -257,7 +268,7 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
     });
 
     /**
-     * Gets the nearest neighbors for the given embeddings.
+     * Gets the nearest neighbors for the given embeddings or content.
      */
     this.route(PipeMethod.POST, "/searchInCollection", async (req) => {
       const body = validateBodyOrParams(
@@ -275,8 +286,8 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
           /** Name of the vector column. */
           vectorField: z.string(),
 
-          /** Embeddings to be searched. */
-          embeddings: z.array(z.any()).min(1),
+          /** Search query - either embeddings array or text content */
+          query: z.union([z.array(z.any()), z.string()]),
 
           /** Additional options. */
           options: z
@@ -286,6 +297,9 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
 
               /** Metric type of the distance calculation. */
               metricType: metricTypeSchema.optional(),
+
+              /** Fields to search in when using content search */
+              searchFields: z.array(z.string()).optional(),
             })
             .optional(),
         })
@@ -301,7 +315,7 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
         resource,
         body.collection,
         body.vectorField,
-        body.embeddings,
+        body.query,
         body.options
       );
 
@@ -327,8 +341,8 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
           /** Name of the vector column. */
           vectorField: z.string(),
 
-          /** Embeddings to be searched. */
-          embeddings: z.array(z.any()).min(1),
+          /** Search query - either embeddings array or text content */
+          query: z.union([z.array(z.any()), z.string()]),
 
           /** Additional options. */
           options: z
@@ -338,6 +352,9 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
 
               /** Metric type of the distance calculation. */
               metricType: metricTypeSchema.optional(),
+
+              /** Fields to search in when using content search */
+              searchFields: z.array(z.string()).optional(),
             })
             .optional(),
         })
@@ -352,7 +369,7 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
         agreement,
         resource,
         body.vectorField,
-        body.embeddings,
+        body.query,
         body.options
       );
 
