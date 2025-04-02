@@ -15,7 +15,7 @@ import { PipeErrorNotFound } from "@/errors/pipe/PipeErrorNotFound";
 /**
  * The details gathered by the Provider from the resource source.
  * This is the "details" type of each resource and it is stored in the database.
- * @responsible Product Category Owner
+ * @responsible Protocol Owner
  */
 export type VectorDBDetails = ResourceDetails & {
   _credentials: any;
@@ -77,8 +77,8 @@ const metricTypeSchema = z.union([
 export type MetricType = z.infer<typeof metricTypeSchema>;
 
 /**
- * Base Provider that defines what kind of actions needs to be implemented for the Product Category.
- * @responsible Product Category Owner
+ * Base Provider that defines what kind of actions needs to be implemented for the Protocol.
+ * @responsible Protocol Owner
  */
 export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDetails> {
   /**
@@ -214,8 +214,8 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
           /** ID of the resource. */
           id: z.number(),
 
-          /** Product category address. */
-          pc: addressSchema,
+          /** Protocol address. */
+          pt: addressSchema,
 
           /** Name of the collection. */
           name: z.string(),
@@ -226,7 +226,7 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
       );
       const { resource, agreement } = await this.getResource(
         body.id,
-        body.pc as Address,
+        body.pt as Address,
         req.requester
       );
 
@@ -247,8 +247,8 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
           /** ID of the resource. */
           id: z.number(),
 
-          /** Product category address. */
-          pc: addressSchema,
+          /** Protocol address. */
+          pt: addressSchema,
 
           /** Name of the collection. */
           name: z.string(),
@@ -256,7 +256,7 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
       );
       const { resource, agreement } = await this.getResource(
         body.id,
-        body.pc as Address,
+        body.pt as Address,
         req.requester
       );
 
@@ -277,8 +277,8 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
           /** ID of the resource. */
           id: z.number(),
 
-          /** Product category address. */
-          pc: addressSchema,
+          /** Protocol address. */
+          pt: addressSchema,
 
           /** Name of the collection. */
           collection: z.string(),
@@ -306,7 +306,7 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
       );
       const { resource, agreement } = await this.getResource(
         body.id,
-        body.pc as Address,
+        body.pt as Address,
         req.requester
       );
 
@@ -335,8 +335,8 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
           /** ID of the resource. */
           id: z.number(),
 
-          /** Product category address. */
-          pc: addressSchema,
+          /** Protocol address. */
+          pt: addressSchema,
 
           /** Name of the vector column. */
           vectorField: z.string(),
@@ -361,7 +361,7 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
       );
       const { resource, agreement } = await this.getResource(
         body.id,
-        body.pc as Address,
+        body.pt as Address,
         req.requester
       );
 
@@ -389,8 +389,8 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
           /** ID of the resource. */
           id: z.number(),
 
-          /** Product category address. */
-          pc: addressSchema,
+          /** Protocol address. */
+          pt: addressSchema,
 
           /** Name of the collection. */
           collection: z.string(),
@@ -401,7 +401,7 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
       );
       const { resource, agreement } = await this.getResource(
         body.id,
-        body.pc as Address,
+        body.pt as Address,
         req.requester
       );
 
@@ -422,8 +422,8 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
           /** ID of the resource. */
           id: z.number(),
 
-          /** Product category address. */
-          pc: addressSchema,
+          /** Protocol address. */
+          pt: addressSchema,
 
           /** Name of the collection. */
           collection: z.string(),
@@ -434,7 +434,7 @@ export abstract class BaseVectorDBProvider extends AbstractProvider<VectorDBDeta
       );
       const { resource, agreement } = await this.getResource(
         body.id,
-        body.pc as Address,
+        body.pt as Address,
         req.requester
       );
 
