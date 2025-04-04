@@ -17,24 +17,22 @@ import {
   Provider,
   ProviderDetails,
   validateBodyOrParams,
-} from "@forest-protocols/sdk";
-import {
+  XMTPv3Pipe,
   Agreement,
   PipeMethod,
   PipeResponseCode,
-  ProductCategory,
+  Protocol,
   Registry,
-  XMTPPipe,
 } from "@forest-protocols/sdk";
-import { red, yellow } from "ansis";
+import { yellow } from "ansis";
 import { readFileSync, statSync } from "fs";
 import { join } from "path";
-import { Account, Address } from "viem";
+import { Account, Address, nonceManager } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
 
 /**
- * Abstract provider that needs to be extended by the Product Category Owner.
+ * Abstract Provider that Protocol Owners has to extend from.
  * @responsible Admin
  */
 export abstract class AbstractProvider<
@@ -42,7 +40,7 @@ export abstract class AbstractProvider<
 > {
   registry!: Registry;
 
-  pcClients: { [address: string]: ProductCategory } = {};
+  protocol!: Protocol;
 
   account!: Account;
 
@@ -53,33 +51,36 @@ export abstract class AbstractProvider<
   logger = logger.child({ context: this.constructor.name });
 
   /**
-   * Initializes the provider if it needs some async operation to be done before start to use it.
+   * Initializes the Provider.
    */
   async init(providerTag: string): Promise<void> {
     const providerConfig = config.providers[providerTag];
 
     if (!providerConfig) {
       this.logger.error(
-        `Provider config not found for provider tag "${providerTag}". Please check your data/providers.json file`
+        `Provider config not found for Provider tag "${providerTag}". Please check your data/providers.json file or environment variables`
       );
       process.exit(1);
     }
 
     // Setup Provider account
     this.account = privateKeyToAccount(
-      providerConfig.providerWalletPrivateKey as Address
+      providerConfig.providerWalletPrivateKey as Address,
+      { nonceManager }
     );
 
     // Initialize clients
-    this.registry = Registry.createWithClient(rpcClient, this.account);
+    this.registry = new Registry({
+      client: rpcClient,
+      account: this.account,
+      address: config.REGISTRY_ADDRESS,
+    });
 
-    this.logger.info("Checking in Protocol Actor information");
+    this.logger.info("Checking in Network Actor registration");
     const provider = await this.registry.getActor(this.account.address);
     if (!provider) {
       this.logger.error(
-        red(
-          `Provider address "${this.account.address}" is not registered in the Protocol. Please register it and try again.`
-        )
+        `Provider "${this.account.address}" is not registered in the Network. Please register it and try again.`
       );
       process.exit(1);
     }
@@ -97,22 +98,38 @@ export abstract class AbstractProvider<
     // `DB.upsertProvider` already checked the existence of the details file
     this.details = tryParseJSON(provDetailFile.content);
 
-    const pcAddresses = await this.registry.getRegisteredPCsOfProvider(
-      provider.id
-    );
+    let ptAddress = providerConfig.protocolAddress;
+    if (ptAddress === undefined) {
+      const registeredPts = await this.registry.getRegisteredPTsOfProvider(
+        this.actorInfo.id
+      );
 
-    for (const pcAddress of pcAddresses) {
-      this.pcClients[pcAddress.toLowerCase()] =
-        ProductCategory.createWithClient(
-          rpcClient,
-          pcAddress as Address,
-          this.account
+      if (registeredPts.length == 0) {
+        throw new Error(
+          `Not found any registered Protocol for Provider tag "${providerTag}". Please register within a Protocol and try again`
         );
+      }
+
+      ptAddress = registeredPts[0];
+      this.logger.warning(
+        `First registered Protocol address (${yellow.bold(
+          ptAddress
+        )}) is using as Protocol address`
+      );
+    } else {
+      this.logger.info(`Using Protocol address ${yellow.bold(ptAddress)}`);
     }
+
+    this.protocol = new Protocol({
+      address: ptAddress,
+      client: rpcClient,
+      account: this.account,
+      registryContractAddress: config.REGISTRY_ADDRESS,
+    });
 
     // Initialize pipe for this operator address if it is not instantiated yet.
     if (!pipes[this.actorInfo.operatorAddr]) {
-      pipes[this.actorInfo.operatorAddr] = new XMTPPipe(
+      pipes[this.actorInfo.operatorAddr] = new XMTPv3Pipe(
         providerConfig.operatorWalletPrivateKey
       );
       // Disable console.info to get rid out of "XMTP dev" warning
@@ -159,10 +176,7 @@ export abstract class AbstractProvider<
           }
         } catch (err: any) {
           this.logger.error(`Couldn't load OpenAPI spec file: ${err.message}`);
-          return {
-            code: PipeResponseCode.OK,
-            body: "",
-          };
+          throw new PipeErrorNotFound(`OpenAPI spec file`);
         }
 
         throw new PipeErrorNotFound(`OpenAPI spec file`);
@@ -190,18 +204,24 @@ export abstract class AbstractProvider<
        */
       this.operatorRoute(PipeMethod.GET, "/resources", async (req) => {
         const params = validateBodyOrParams(
-          req.params,
+          req.body || req.params,
           z.object({
             /** ID of the resource. */
             id: z.number().optional(),
 
-            /** Product category address that the resource created in. */
-            pc: addressSchema.optional(), // A pre-defined Zod schema for smart contract addresses.
+            /** Protocol address that the resource created in. */
+            pt: addressSchema.optional(), // A pre-defined Zod schema for smart contract addresses.
+            pc: addressSchema.optional(), // Alternative name for `pt` parameter
           })
         );
 
+        // If `pc` alias is given, use it.
+        if (params.pc) {
+          params.pt = params.pc;
+        }
+
         // If not both of them are given, send all resources of the requester
-        if (params.id === undefined || params.pc === undefined) {
+        if (params.id === undefined || params.pt === undefined) {
           return {
             code: PipeResponseCode.OK,
             body: await DB.getAllResourcesOfUser(req.requester as Address),
@@ -212,11 +232,11 @@ export abstract class AbstractProvider<
         // Since XMTP has its own authentication layer, we don't need to worry about
         // if this request really sent by the owner of the resource. So if the sender is
         // different from owner of the resource, basically the resource won't be found because
-        // we are looking to the database with agreement id + requester address + product category address.
+        // we are looking to the database with agreement id + requester address + protocol address.
         const resource = await DB.getResource(
           params.id,
           req.requester,
-          params.pc as Address
+          params.pt as Address
         );
 
         if (!resource) {
@@ -244,24 +264,17 @@ export abstract class AbstractProvider<
   }
 
   /**
-   * Gets the Product Category client from the registered product category list of this provider.
-   */
-  getPcClient(pcAddress: Address) {
-    return this.pcClients[pcAddress.toLowerCase()];
-  }
-
-  /**
    * Gets a resource that stored in the database and the corresponding agreement from blockchain
    * @param id ID of the resource/agreement
-   * @param pcAddress Product category address
+   * @param ptAddress Protocol address
    * @param requester Requester of this resource
    */
   protected async getResource(
     id: number,
-    pcAddress: Address,
+    ptAddress: Address,
     requester: string
   ) {
-    const resource = await DB.getResource(id, requester, pcAddress);
+    const resource = await DB.getResource(id, requester, ptAddress);
 
     if (
       !resource || // Resource does not exist
@@ -271,13 +284,12 @@ export abstract class AbstractProvider<
       throw new PipeErrorNotFound("Resource");
     }
 
-    const pcClient = this.getPcClient(pcAddress); // Product category client.
-    const agreement = await pcClient.getAgreement(resource.id); // Retrieve the agreement details from chain
+    const agreement = await this.protocol.getAgreement(resource.id); // Retrieve the agreement details from chain
 
     return {
       resource,
       agreement,
-      pcClient,
+      protocol: this.protocol,
     };
   }
 
