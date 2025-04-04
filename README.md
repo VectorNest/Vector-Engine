@@ -1,8 +1,8 @@
-# Protocol: `Vector Nest`
+# Protocol: `Vector Engine`
 
 ## Description
 
-**Vector Nest** is a high-performance, multi-modal vector storage protocol designed for intelligent and AI-powered search across structured, unstructured, and visual data.
+**Vector Engine** is a high-performance, multi-modal vector storage protocol designed for intelligent and AI-powered search across structured, unstructured, and visual data.
 
 It provides providers with a standardized interface for creating, managing, and querying vector collections, and empowers validators to enforce quality and fairness through automated performance evaluation.
 
